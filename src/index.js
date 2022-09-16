@@ -1,9 +1,10 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './style/index.css';
+// ??? 为什么注释掉App组件就没法显示antd样式？
 import App from './components/App';
 import reportWebVitals from './reportWebVitals';
-import UserForm from './components/UserForm';
+import UserInfoPage from './pages/userInfoPage';
 
 // StrictMode 不会渲染任何可见的 UI，类似React.Fragment，根元素可以多于一个
 // 仅在开发环境中运行检查，生产模式不会运行
@@ -11,8 +12,7 @@ const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
   <React.StrictMode>
     <h2>title in index.js with DIY components</h2>
-    {/* <App /> */}
-    <UserForm pageName="my antd page"/>
+    <UserInfoPage />
   </React.StrictMode>
 );
 
