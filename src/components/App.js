@@ -1,4 +1,4 @@
-import logo from '../logo.svg';
+import logo from '../assets/logo.svg';
 import '../style/App.css';
 import {Button} from 'antd';
 
