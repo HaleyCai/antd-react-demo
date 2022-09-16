@@ -1,5 +1,6 @@
 import logo from './logo.svg';
 import './App.css';
+import {Button} from 'antd';
 
 function App() {
   return (
@@ -9,6 +10,8 @@ function App() {
         <p>
           Edit <code>src/App.js</code> and save to reload.
         </p>
+        <h3>add antd button:</h3>
+        <Button type="primary">Test Button</Button>
         <a
           className="App-link"
           href="https://reactjs.org"
