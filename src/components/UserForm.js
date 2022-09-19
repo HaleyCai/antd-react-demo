@@ -56,9 +56,21 @@ function checkCallNo(_, value){
 
 // 子组件1：搜索框
 function SearchField(props){
+
+    const onFinish = (values)=>{
+        const {name, callNo} = values;
+        const searchValue = {
+            name: name ? name : null,
+            callNo: callNo ? callNo : null
+        }
+        // 调用父组件传入的方法onSearch
+        props.onSearch(searchValue);
+        
+    }
+
     return (
         <Card className='searchField'>
-            <Form name="search">
+            <Form name="search" onFinish={onFinish} autoComplete="false">
                 <Row align="end">
                     <Col span={6}>
                         <Form.Item name="name" label="规则名称">
@@ -76,7 +88,7 @@ function SearchField(props){
                         <Form.Item name="buttons">
                             <Space size="large">
                                 <Button name="reset">重置</Button>
-                                <Button name="submit" type="primary">查询</Button>
+                                <Button name="submit" type="primary" htmlType="submit">查询</Button>
                             </Space>
                         </Form.Item>
                     </Col>
@@ -86,7 +98,7 @@ function SearchField(props){
     )
 }
 
-
+// 可编辑表格组件，正在编辑的行渲染为<Input/>
 const EditableCell = ( {
     editing,
     dataIndex,
@@ -146,7 +158,7 @@ const getOneNewData = (key) => {
     return newRow;
 }
 
-// 子组件2：查询表格
+// 子组件3：查询表格
 function TableField(props){
     // Form.useForm() 创建 Form 实例，用于管理所有数据状态。
     const [form] = Form.useForm();
@@ -366,11 +378,14 @@ function TableField(props){
 // 父组件
 // state 存储：1. data，
 function UserForm(props){
-
+    const onSearch = (values)=>{
+        console.log("in onSearch, get searchValues:");
+        console.log(values);
+    }
     return (
         <React.Fragment>
             <Space direction="vertical" size="large" style={{ display: 'flex' , marginLeft:40, marginRight:40}}>
-                <SearchField />
+                <SearchField onSearch={onSearch}/>
                 <TableField columns={usercol}/>
             </Space>
         </React.Fragment>
