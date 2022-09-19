@@ -1,7 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import './style/index.css';
-// ??? 为什么注释掉App组件就没法显示antd样式？
+import 'antd/dist/antd.css';
 import App from './components/App';
 import reportWebVitals from './reportWebVitals';
 import UserInfoPage from './pages/userInfoPage';
@@ -11,10 +10,12 @@ import UserInfoPage from './pages/userInfoPage';
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
   <React.StrictMode>
+    {/* <App /> */}
     <h2>title in index.js with DIY components</h2>
     <UserInfoPage />
   </React.StrictMode>
 );
+
 
 // If you want to start measuring performance in your app, pass a function
 // to log results (for example: reportWebVitals(console.log))
