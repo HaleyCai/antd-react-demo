@@ -21,9 +21,6 @@ const datacol = Object.keys(userdata[0]).map( (item, index)=>{
     }
 } )
 
-// 为表格第一列添加复选框
-const rowSelection = [];
-
 
 // 忽略不显示在页面的属性名
 const IGNORE_COLS = ["disabled", "href", "avatar"];
@@ -154,8 +151,9 @@ function TableField(props){
     // Form.useForm() 创建 Form 实例，用于管理所有数据状态。
     const [form] = Form.useForm();
     const [data, setData] = useState(userdata);
-    const [nextKey, setNextKey] = useState(getMaxKey(data)+1);
+    const [maxKey, setMaxKey] = useState(getMaxKey(data));
     const [editingKey, setEditingKey] = useState('');
+    const [selectedRowKeys, setSelectedRowKeys] = useState([]);
 
     const usercol = props.columns;
     
@@ -207,9 +205,10 @@ function TableField(props){
         }
     }
 
-    // 取消提交编辑结果
+    // 取消提交编辑结果、取消勾选复选框批量删除
     const cancel = () => {
         setEditingKey('');
+        setSelectedRowKeys('');
     };
 
 
@@ -230,17 +229,44 @@ function TableField(props){
         setEditingKey('');
     }
 
-    // 新增函数：用setData push一个新的值
+    // 新增功能：用setData push一个新的值
     // key值如何生成->最大key值+1
     const handleAdd = () => {
         console.log("click 新增");
         const newData = [...data];
+        const nextKey = maxKey + 1;
         newData.push(getOneNewData(nextKey))
-        
+        setMaxKey(nextKey);
         setData(newData);
-        setNextKey(nextKey + 1);
     }
 
+    // 批量删除功能：
+    // 每当复选框勾选变化，将结果存入state
+    const onselectionchange = (newKeys)=>{
+        console.log("new selectedRowKeys" + newKeys);
+        setSelectedRowKeys(newKeys);
+    }
+
+    // 为表格第一列添加复选框
+    const rowSelection = {
+        selectedRowKeys,
+        onChange: onselectionchange
+    };
+
+    // 批量删除 selecteRowKeys中的key的数据
+    const handelDeleteMult = () => {
+        console.log("click 批量删除: ")
+        console.log(selectedRowKeys);
+        const newData = [...data].filter( (item) => {
+            if(selectedRowKeys.includes(item.key)){
+                return null;
+            }else{
+                return item;
+            }
+        })
+        setData(newData);
+        setSelectedRowKeys([]);
+    }
     
     // 为列表最后一列添加编辑、删除操作
     // 若正在编辑当前行，操作列变为“确认，取消”
@@ -252,7 +278,10 @@ function TableField(props){
                 <Typography.Link onClick={()=> handelSave(record.key)}>
                     确认
                 </Typography.Link>
-                <Popconfirm title="取消修改？" onConfirm={cancel}>
+                <Popconfirm title="取消修改？" 
+                            onConfirm={cancel}
+                            okText="是" 
+                            cancelText="否">
                     <Typography.Link>取消</Typography.Link>
                 </Popconfirm>
             </Space>
@@ -261,7 +290,10 @@ function TableField(props){
             <Typography.Link onClick={()=>handleEdit(record)}>
                 编辑
             </Typography.Link>
-            <Popconfirm title="确定删除该条数据吗？" onConfirm={() => handleDelete(record.key)} okText="是" cancelText="否">
+            <Popconfirm title="确定删除该条数据吗？" 
+                        onConfirm={() => handleDelete(record.key)} 
+                        okText="是" 
+                        cancelText="否">
                 <Typography.Link>删除</Typography.Link>
             </Popconfirm>
     </Space>)
@@ -299,7 +331,13 @@ function TableField(props){
                 <Col span={8} offset={12}>
                     <Space align='baseline' size="large">
                         <Button name="add" type="primary" onClick={handleAdd}>新增</Button>
-                        <Button name='deleteMult' type="primary">批量删除</Button>
+                        <Popconfirm title="是否要批量删除所勾选的数据？"
+                                    onConfirm={handelDeleteMult}
+                                    onCancel={cancel}
+                                    okText="是"
+                                    cancelText="否">
+                            <Button name='deleteMult' type="primary">批量删除</Button>
+                        </Popconfirm>
                         <ReloadOutlined />
                         <ColumnHeightOutlined />
                         <SettingFilled />
@@ -310,7 +348,7 @@ function TableField(props){
             {/* Table外用Form包裹：因为EditableCell是Form.Item，需要用Form包裹在外层*/}
             {/* Table中components：用EditableCell覆盖默认的 table 元素，正在修改的变为input框，否则是原始table元素 */}
             <Form form={form} component={false}>
-                <Table  rowSelection={{rowSelection}}
+                <Table  rowSelection={rowSelection}
                         components={{
                             body: {
                             cell: EditableCell,
