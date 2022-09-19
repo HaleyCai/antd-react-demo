@@ -4,19 +4,20 @@
 // 需要加flex布局吗？？？
 import React, {useState, useEffect} from 'react';
 import userdata from "../assets/arr.json";
-import {Table, Typography, Card, Input, Form, Button, Col, Row, Space, Popconfirm} from 'antd';
+import {Table, Typography, Card, Input, InputNumber, Form, Button, Col, Row, Space, Popconfirm} from 'antd';
 import {SettingFilled, ReloadOutlined, ColumnHeightOutlined} from '@ant-design/icons';
 
 const {Title} = Typography;
 
-const USER_TITLES = ["序号", "是否禁用", "地址", "图标", "规则名称", "所有者", "描述", "呼叫序号", "状态", "更新时间", "创建时间", "进度"];
-
+const USER_TITLES =         ["序号", "是否禁用", "地址", "图标", "规则名称", "所有者", "描述", "呼叫序号", "状态", "更新时间", "创建时间", "进度"];
+const USER_PROPS_EDITABLE = [false, false, false, false, true, true, true, true, true, true, false, true]
 // 从json中读取数据的各项属性，并生成colomn列表，展示在table的第一行
 const datacol = Object.keys(userdata[0]).map( (item, index)=>{
     return {
         title: USER_TITLES[index],
         dataIndex: item,
-        key: `k_${item}`
+        key: `k_${item}`,
+        editable: USER_PROPS_EDITABLE[index]
     }
 } )
 
@@ -27,8 +28,6 @@ const rowSelection = [];
 // 忽略不显示在页面的属性名
 const IGNORE_COLS = ["disabled", "href", "avatar"];
 
-// TO-DO: 用interface 规定允许显示的属性（必须在TS中使用，研究如何在React中使用ts）
-
 const usercol = datacol.filter( (obj) =>{
     if(!IGNORE_COLS.includes(obj["dataIndex"])){
         return obj;
@@ -36,35 +35,13 @@ const usercol = datacol.filter( (obj) =>{
     return null;
 })
 
-// TO-DO:
-const handleEdit = ()=>{
-    console.log("click 修改")
-}
-
-// TO-DO:
-const handleDelete = (key)=>{
-    console.log("click 删除")
-    console.log(key);
-}
-
-// TO-DO：为列表最后一列添加编辑操作按钮
 usercol.push({
     title: "操作",
     dataIndex: "action",
     key: "k_action",
-    render: (_, record) => (
-        <Space size="middle">
-            <a onClick={handleEdit}>修改</a>
-            {/*气泡确认框*/}
-            <Popconfirm title="确定删除该条数据吗？" onConfirm={() => handleDelete(record.key)} okText="是" cancelText="否">
-                <a>删除</a>
-            </Popconfirm>
-        </Space>
-    )
-})
-
-console.log("user coloum");
-console.log(usercol);
+    editable: false,
+    render: ""
+});
 
 // TO-DO：添加查询功能
 
@@ -112,26 +89,205 @@ function SearchField(props){
     )
 }
 
+
+const EditableCell = ( {
+    editing,
+    dataIndex,
+    title,
+    inputType,
+    record,
+    index,
+    children,
+    ...restProps
+}) => {
+    const inputNode = inputType === 'number' ? <InputNumber /> : <Input />;
+
+    // 如果是正在修改的行，将其Form.Item渲染为input框，否则是table原始元素
+    return (
+        <td {...restProps}>
+            {editing ? (
+                <Form.Item 
+                    name={dataIndex}
+                    rules={[
+                        {
+                          required: true,
+                          message: `Please Input ${title}!`,
+                        },
+                      ]}
+                >
+                    {inputNode}
+                </Form.Item>
+            ):(children)}
+        </td>
+    );
+};
+
+// 获取数组中最大的key值【为了新增key不重复】
+const getMaxKey = (data) => {
+    const keys = data.map((item)=> item.key);
+    const maxKey = Math.max(...keys);
+    return maxKey;
+}
+
+// 新增一条数据
+const getOneNewData = (key) => {
+    const time = new Date().toUTCString();
+    const newRow = {
+        key: key,
+        disabled: false,
+        href: '',
+        avatar: '',
+        name: `TradeCode ${key}`,
+        owner: "test owner",
+        desc: 'test desc',
+        callNo: 111,
+        status: 0,
+        updatedAt: time,
+        createdAt: time,
+        progress: 0
+    }
+    return newRow;
+}
+
 // 子组件2：查询表格
 function TableField(props){
+    // Form.useForm() 创建 Form 实例，用于管理所有数据状态。
     const [form] = Form.useForm();
+    const [data, setData] = useState(userdata);
+    const [nextKey, setNextKey] = useState(getMaxKey(data)+1);
     const [editingKey, setEditingKey] = useState('');
 
-    const edit = (record) => {
+    const usercol = props.columns;
+    
+    const isEditing = (record) => record.key === editingKey;
+
+    // 编辑函数：点击后该行样式被重新渲染为Input，修改的值保存在form中
+    const handleEdit = (record) => {
+        console.log("click 修改")
+        console.log(record.key);
+        console.log(record);
+        const updated = {
+            updatedAt: new Date().toUTCString()
+        }
+        console.log("updatedAt" + updated);
+        // 设置表单的值（该值将直接传入 form store 中。如果你不希望传入对象被修改，请克隆后传入）
+        // 用record中的同名属性值覆盖前面的默认控制
         form.setFieldsValue({
             name: '',
             owner: '',
             desc: '',
             callNo: '',
             status: '',
+            updatedAt: '',
+            progress: '',
             ...record,
+            ...updated
         });
         setEditingKey(record.key);
     };
 
+    // 确认提交编辑结果函数：在编辑后调用异步save函数，用setData更新table整体的data
+    const handelSave = async(key) =>{
+        try {
+            const modifiedRow = await form.validateFields();
+            console.log("modified row:")
+            console.log(modifiedRow);
+            // 被修改的行的index
+            const newData = [...data];
+            const index = newData.findIndex((item)=>item.key === key);
+            const oldRow = newData[index];
+            // 从index起始，修改1条数据，修改为{...oldRow, ...modefiedRow}=》用modified的值覆盖old值
+            newData.splice(index, 1, {...oldRow, ...modifiedRow});
+
+            setData(newData);
+            setEditingKey('');
+        }
+        catch(errInfo){
+            console.log("Validate Failed", errInfo);
+        }
+    }
+
+    // 取消提交编辑结果
     const cancel = () => {
         setEditingKey('');
     };
+
+
+
+    // 删除函数：遍历data，比对key是传入的值，则在setData中删除该行数据
+    const handleDelete = (key)=>{
+        console.log("click 删除")
+        console.log(key);
+        const newData = [...data].filter( (item) => {
+            if(item.key === key){
+                return null;
+            }else{
+                    return item;
+            }
+        })
+        console.log(newData);
+        setData(newData);
+        setEditingKey('');
+    }
+
+    // 新增函数：用setData push一个新的值
+    // key值如何生成->最大key值+1
+    const handleAdd = () => {
+        console.log("click 新增");
+        const newData = [...data];
+        newData.push(getOneNewData(nextKey))
+        
+        setData(newData);
+        setNextKey(nextKey + 1);
+    }
+
+    
+    // 为列表最后一列添加编辑、删除操作
+    // 若正在编辑当前行，操作列变为“确认，取消”
+    // 不在编辑当前行，操作列为“编辑，删除”
+    usercol[usercol.length-1].render = ((_, record) => {
+        const editCurrentRow = isEditing(record);
+        return editCurrentRow? (
+            <Space size="middle">
+                <Typography.Link onClick={()=> handelSave(record.key)}>
+                    确认
+                </Typography.Link>
+                <Popconfirm title="取消修改？" onConfirm={cancel}>
+                    <Typography.Link>取消</Typography.Link>
+                </Popconfirm>
+            </Space>
+        ): (
+            <Space size="middle">
+            <Typography.Link onClick={()=>handleEdit(record)}>
+                编辑
+            </Typography.Link>
+            <Popconfirm title="确定删除该条数据吗？" onConfirm={() => handleDelete(record.key)} okText="是" cancelText="否">
+                <Typography.Link>删除</Typography.Link>
+            </Popconfirm>
+    </Space>)
+        
+        
+    })
+
+    // 最终table显示的colums
+    const mergedColumns = usercol.map( (colItem) => {
+        // 可为每列添加一个editable属性，判断是否能修改该属性
+        // 不可修改的直接返回原colItem, 可修改的返回onCell
+        if(!colItem.editable){
+            return colItem;
+        }
+
+        return {
+            ...colItem,
+            onCell: (record) => ({
+                record,
+                inputType: (colItem.dataIndex === "callNo" || colItem.dataIndex=== "progress")? "number": "text",
+                dataIndex: colItem.dataIndex,
+                title: colItem.title,
+                editing: isEditing(record)
+            })
+        }
+    } )
 
     return (
         <Card className='tableField'>
@@ -140,9 +296,10 @@ function TableField(props){
                     <Title level={4}>查询表格</Title>
                 </Col>
 
-                <Col span={4} offset={16}>
+                <Col span={8} offset={12}>
                     <Space align='baseline' size="large">
-                        <Button name="add" type="primary">新增</Button>
+                        <Button name="add" type="primary" onClick={handleAdd}>新增</Button>
+                        <Button name='deleteMult' type="primary">批量删除</Button>
                         <ReloadOutlined />
                         <ColumnHeightOutlined />
                         <SettingFilled />
@@ -150,8 +307,19 @@ function TableField(props){
                 </Col>
             </Row>
 
-            <Table rowSelection={{rowSelection}} 
-                    dataSource={props.userdata} columns={usercol} />
+            {/* Table外用Form包裹：因为EditableCell是Form.Item，需要用Form包裹在外层*/}
+            {/* Table中components：用EditableCell覆盖默认的 table 元素，正在修改的变为input框，否则是原始table元素 */}
+            <Form form={form} component={false}>
+                <Table  rowSelection={{rowSelection}}
+                        components={{
+                            body: {
+                            cell: EditableCell,
+                            },
+                        }}
+                        bordered
+                        dataSource={data}
+                        columns={mergedColumns}/>
+            </Form>
         </Card>
     )
 
@@ -160,13 +328,12 @@ function TableField(props){
 // 父组件
 // state 存储：1. data，
 function UserForm(props){
-    const [userData, setuserData] = useState(userdata);
 
     return (
         <React.Fragment>
             <Space direction="vertical" size="large" style={{ display: 'flex' , marginLeft:40, marginRight:40}}>
                 <SearchField />
-                <TableField userdata={userData}/>
+                <TableField columns={usercol}/>
             </Space>
         </React.Fragment>
     )
