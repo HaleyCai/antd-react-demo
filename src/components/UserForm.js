@@ -2,60 +2,62 @@
 // 先写死数据，再写从接口调数据（用axios）
 // 用function组件而不是class组件
 // 需要加flex布局吗？？？
-import React, {useState, useEffect} from 'react';
-import userdata from "../assets/arr.json";
+import React, {useState} from 'react';
 import {Table, Typography, Card, Input, InputNumber, Form, Button, Col, Row, Space, Popconfirm} from 'antd';
 import {SettingFilled, ReloadOutlined, ColumnHeightOutlined} from '@ant-design/icons';
-
 const {Title} = Typography;
 
-const USER_TITLES =         ["序号", "是否禁用", "地址", "图标", "规则名称", "所有者", "描述", "呼叫序号", "状态", "更新时间", "创建时间", "进度"];
-const USER_PROPS_EDITABLE = [false, false, false, false, true, true, true, true, true, true, false, true]
-// 从json中读取数据的各项属性，并生成colomn列表，展示在table的第一行
-const datacol = Object.keys(userdata[0]).map( (item, index)=>{
-    return {
-        title: USER_TITLES[index],
-        dataIndex: item,
-        key: `k_${item}`,
-        editable: USER_PROPS_EDITABLE[index]
-    }
-} )
-
-
-// 忽略不显示在页面的属性名
-const IGNORE_COLS = ["disabled", "href", "avatar"];
-
-const usercol = datacol.filter( (obj) =>{
-    if(!IGNORE_COLS.includes(obj["dataIndex"])){
-        return obj;
-    }
-    return null;
-})
-
-usercol.push({
-    title: "操作",
-    dataIndex: "action",
-    key: "k_action",
-    editable: false,
-    render: ""
-});
-
-// TO-DO：添加查询功能
-
-
-// 检验输入是否是数字
-function checkCallNo(_, value){
-    console.log(`输入序号为${value}, doing nothing`);
-    const input = parseInt(value);
-    if(input){
-        return Promise.resolve();
-    }
-    
-    return Promise.reject("输入错误，呼叫序号必须为数字");
+// 获取数组中最大的key值【为了新增key不重复】
+const getMaxKey = (data) => {
+    const keys = data.map((item)=> item.key);
+    const maxKey = Math.max(...keys);
+    return maxKey;
 }
 
-// 子组件1：搜索框
+// 新增一条数据
+const getOneNewData = (key) => {
+    const time = new Date().toUTCString();
+    const newRow = {
+        key: key,
+        disabled: false,
+        href: '',
+        avatar: '',
+        name: `TradeCode ${key}`,
+        owner: "test owner",
+        desc: 'test desc',
+        callNo: 111,
+        status: 0,
+        updatedAt: time,
+        createdAt: time,
+        progress: 0
+    }
+    return newRow;
+}
+
+// 子组件1：查询框
 function SearchField(props){
+    const [form] = Form.useForm();
+
+    // input validator:
+    // 1. 检验输入的name是否是TradeCode [number]格式
+    const validName = (_, value) => {
+        console.log(`输入规则名称为${value}`);
+        const match = value.match(/TradeCode \d+/);
+        if(match){
+            return Promise.resolve();
+        }
+        return Promise.reject("输入错误，规则名称必须为TradeCode [数字]的格式");
+    }
+
+    // 2. 检验输入的checkCallNo
+    const validCallNo = (_, value) => {
+        console.log(`输入序号为${value}`);
+        const input = parseInt(value);
+        if(input){
+            return Promise.resolve();
+        }
+        return Promise.reject("输入错误，呼叫序号必须为数字");
+    }
 
     const onFinish = (values)=>{
         const {name, callNo} = values;
@@ -68,18 +70,23 @@ function SearchField(props){
         
     }
 
+    const onReset = () => {
+        form.resetFields();
+        props.onReset();
+    }
+
     return (
         <Card className='searchField'>
-            <Form name="search" onFinish={onFinish} autoComplete="false">
+            <Form name="search" form={form} onFinish={onFinish} autoComplete="false">
                 <Row align="end">
                     <Col span={6}>
-                        <Form.Item name="name" label="规则名称">
+                        <Form.Item name="name" label="规则名称" rules={[{validator: validName}]}>
                             <Input placeholder='请输入名称'/>
                         </Form.Item>
                     </Col>
 
                     <Col span={6} offset={4}>
-                        <Form.Item name="callNo" label="呼叫序号" rules={[{validator: checkCallNo}]}>
+                        <Form.Item name="callNo" label="呼叫序号" rules={[{validator: validCallNo}]}>
                             <Input placeholder='请输入序号'/>
                         </Form.Item>
                     </Col>
@@ -87,7 +94,7 @@ function SearchField(props){
                     <Col span={4} offset={3}>
                         <Form.Item name="buttons">
                             <Space size="large">
-                                <Button name="reset">重置</Button>
+                                <Button name="reset" onClick={onReset}>重置</Button>
                                 <Button name="submit" type="primary" htmlType="submit">查询</Button>
                             </Space>
                         </Form.Item>
@@ -131,48 +138,18 @@ const EditableCell = ( {
     );
 };
 
-// 获取数组中最大的key值【为了新增key不重复】
-const getMaxKey = (data) => {
-    const keys = data.map((item)=> item.key);
-    const maxKey = Math.max(...keys);
-    return maxKey;
-}
-
-// 新增一条数据
-const getOneNewData = (key) => {
-    const time = new Date().toUTCString();
-    const newRow = {
-        key: key,
-        disabled: false,
-        href: '',
-        avatar: '',
-        name: `TradeCode ${key}`,
-        owner: "test owner",
-        desc: 'test desc',
-        callNo: 111,
-        status: 0,
-        updatedAt: time,
-        createdAt: time,
-        progress: 0
-    }
-    return newRow;
-}
-
-// 子组件3：查询表格
+// 子组件2：查询表格
 function TableField(props){
     // Form.useForm() 创建 Form 实例，用于管理所有数据状态。
     const [form] = Form.useForm();
-    const [data, setData] = useState(userdata);
-    const [maxKey, setMaxKey] = useState(getMaxKey(data));
     const [editingKey, setEditingKey] = useState('');
     const [selectedRowKeys, setSelectedRowKeys] = useState([]);
 
     const usercol = props.columns;
-    
     const isEditing = (record) => record.key === editingKey;
 
     // 编辑函数：点击后该行样式被重新渲染为Input，修改的值保存在form中
-    const handleEdit = (record) => {
+    const edit = (record) => {
         console.log("click 修改")
         console.log(record.key);
         console.log(record);
@@ -197,19 +174,14 @@ function TableField(props){
     };
 
     // 确认提交编辑结果函数：在编辑后调用异步save函数，用setData更新table整体的data
-    const handelSave = async(key) =>{
+    const save = async(key) =>{
         try {
             const modifiedRow = await form.validateFields();
             console.log("modified row:")
             console.log(modifiedRow);
-            // 被修改的行的index
-            const newData = [...data];
-            const index = newData.findIndex((item)=>item.key === key);
-            const oldRow = newData[index];
-            // 从index起始，修改1条数据，修改为{...oldRow, ...modefiedRow}=》用modified的值覆盖old值
-            newData.splice(index, 1, {...oldRow, ...modifiedRow});
 
-            setData(newData);
+            // 传递被修改的一整行数据对象给父组件
+            props.handleEdit(key, modifiedRow);
             setEditingKey('');
         }
         catch(errInfo){
@@ -224,32 +196,20 @@ function TableField(props){
     };
 
 
-
-    // 删除函数：遍历data，比对key是传入的值，则在setData中删除该行数据
-    const handleDelete = (key)=>{
+    // 删除一条数据功能：遍历data，比对key是传入的值，则在setData中删除该行数据
+    const deleteRow = (key)=>{
         console.log("click 删除")
         console.log(key);
-        const newData = [...data].filter( (item) => {
-            if(item.key === key){
-                return null;
-            }else{
-                    return item;
-            }
-        })
-        console.log(newData);
-        setData(newData);
+
+        props.handleDelete([key]);
         setEditingKey('');
     }
 
     // 新增功能：用setData push一个新的值
     // key值如何生成->最大key值+1
-    const handleAdd = () => {
+    const add = () => {
         console.log("click 新增");
-        const newData = [...data];
-        const nextKey = maxKey + 1;
-        newData.push(getOneNewData(nextKey))
-        setMaxKey(nextKey);
-        setData(newData);
+        props.handleAdd();
     }
 
     // 批量删除功能：
@@ -266,17 +226,11 @@ function TableField(props){
     };
 
     // 批量删除 selecteRowKeys中的key的数据
-    const handelDeleteMult = () => {
+    const deleteMult = () => {
         console.log("click 批量删除: ")
         console.log(selectedRowKeys);
-        const newData = [...data].filter( (item) => {
-            if(selectedRowKeys.includes(item.key)){
-                return null;
-            }else{
-                return item;
-            }
-        })
-        setData(newData);
+
+        props.handleDelete(selectedRowKeys);
         setSelectedRowKeys([]);
     }
     
@@ -287,7 +241,7 @@ function TableField(props){
         const editCurrentRow = isEditing(record);
         return editCurrentRow? (
             <Space size="middle">
-                <Typography.Link onClick={()=> handelSave(record.key)}>
+                <Typography.Link onClick={()=> save(record.key)}>
                     确认
                 </Typography.Link>
                 <Popconfirm title="取消修改？" 
@@ -299,11 +253,11 @@ function TableField(props){
             </Space>
         ): (
             <Space size="middle">
-            <Typography.Link onClick={()=>handleEdit(record)}>
+            <Typography.Link onClick={()=>edit(record)}>
                 编辑
             </Typography.Link>
             <Popconfirm title="确定删除该条数据吗？" 
-                        onConfirm={() => handleDelete(record.key)} 
+                        onConfirm={() => deleteRow(record.key)} 
                         okText="是" 
                         cancelText="否">
                 <Typography.Link>删除</Typography.Link>
@@ -342,9 +296,9 @@ function TableField(props){
 
                 <Col span={8} offset={12}>
                     <Space align='baseline' size="large">
-                        <Button name="add" type="primary" onClick={handleAdd}>新增</Button>
+                        <Button name="add" type="primary" onClick={add}>新增</Button>
                         <Popconfirm title="是否要批量删除所勾选的数据？"
-                                    onConfirm={handelDeleteMult}
+                                    onConfirm={deleteMult}
                                     onCancel={cancel}
                                     okText="是"
                                     cancelText="否">
@@ -367,7 +321,7 @@ function TableField(props){
                             },
                         }}
                         bordered
-                        dataSource={data}
+                        dataSource={props.data}
                         columns={mergedColumns}/>
             </Form>
         </Card>
@@ -377,15 +331,89 @@ function TableField(props){
 
 // 父组件
 function UserForm(props){
-    const onSearch = (values)=>{
-        console.log("in onSearch, get searchValues:");
-        console.log(values);
+    // state存储原始数据data?
+    // 如果查询，将查询结果代替TableField的dataSource
+    // 在查询状态下，也能
+    const [data, setData] = useState(props.userdata);
+    const [selectData, setSelectData] = useState(props.userdata);
+    const [maxKey, setMaxKey] = useState(getMaxKey(props.userdata));
+    const [isSearched, setIsSearched] = useState(false);
+
+    // SEARCH: 查询，将查询结果更新到selectData
+    // TODO: 调用接口，数据库查询
+    const handleSearch = (values)=>{
+        console.log("in father handleSearch, get searchValues:");
+        const {name, callNo} = values;
+        console.log(name, callNo);
+
+        const result = data.filter( item => {
+            if(item.name === name && item.callNo === parseInt(callNo)){
+                return item;
+            }
+            return null;
+        })
+        console.log("search result:");
+        console.log(result);
+        setSelectData(result);
+        // ！！问题，search后的table进行修改，无法改动
+        setIsSearched(true);
     }
+
+    const handleReset = () => {
+        console.log("in father handleReset");
+        setIsSearched(false);
+    }
+
+    // UPDATE: 修改一条数据并将结果保存，该函数传递给TableField执行
+    // TODO：调用接口，数据库修改函数
+    const handleEdit = (key, modifiedRow) => {
+        console.log("in father handleEdit, modifiedRow:");
+        console.log(modifiedRow);
+        //const key = modifiedRow['key'];
+        // 被修改的行的index
+        const newData = [...data];
+        const index = newData.findIndex((item)=>item.key === key);
+        const oldRow = newData[index];
+        // 从index起始，修改1条数据，修改为{...oldRow, ...modefiedRow}=》用modified的值覆盖old值
+        newData.splice(index, 1, {...oldRow, ...modifiedRow});
+        setData(newData);
+    }
+
+    // ADD: 新增一条数据并将结果保存，新增逻辑可在函数getOneNewData(nextKey)中自定义
+    // TODO: 调用接口，数据库增加一条数据
+    const handleAdd = () => {
+        console.log("in father handleAdd:");
+        const newData = [...data];
+        const nextKey = maxKey + 1;
+        newData.push(getOneNewData(nextKey))
+        setMaxKey(nextKey);
+        setData(newData);
+    }
+
+    // DELETE: 删除一条、或多条数据，传入数据的key即可
+    // TODO：调用接口，删除一条数据的数据库函数，循环执行多次
+    const handleDelete = (keys) => {
+        console.log("in father handleDelte, deleteKeys:");
+        console.log(keys);
+        const newData = [...data].filter( (item) => {
+            if(keys.includes(item.key)){
+                return null;
+            }else{
+                return item;
+            }
+        })
+        setData(newData);
+    }
+
+    // 如果查询，isSearched=true，TableField的data渲染selectData，否则渲染data
     return (
         <React.Fragment>
             <Space direction="vertical" size="large" style={{ display: 'flex' , marginLeft:40, marginRight:40}}>
-                <SearchField onSearch={onSearch}/>
-                <TableField columns={usercol}/>
+                <SearchField onSearch={handleSearch} onReset={handleReset}/>
+                <TableField data={isSearched ? selectData : data} columns={props.usercol}
+                            handleEdit={handleEdit}
+                            handleAdd={handleAdd}
+                            handleDelete={handleDelete}/>
             </Space>
         </React.Fragment>
     )
