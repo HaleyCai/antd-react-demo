@@ -3,9 +3,9 @@
 // 用function组件而不是class组件
 // 需要加flex布局吗？？？
 import React, {useState} from 'react';
-import {Table, Typography, Card, Input, InputNumber, Form, Button, Col, Row, Space, Popconfirm} from 'antd';
+import {Table, Typography, Card, Input, InputNumber, Form, Button, Col, Row, Space, Popconfirm, Checkbox} from 'antd';
 import {SettingFilled, ReloadOutlined, ColumnHeightOutlined} from '@ant-design/icons';
-const {Title} = Typography;
+const {Text, Title} = Typography;
 
 // 获取数组中最大的key值【为了新增key不重复】
 const getMaxKey = (data) => {
@@ -42,7 +42,12 @@ function SearchField(props){
     // 1. 检验输入的name是否是TradeCode [number]格式
     const validName = (_, value) => {
         console.log(`输入规则名称为${value}`);
-        const match = value.match(/TradeCode \d+/);
+        // 输入为空值也可通过验证
+        if(!value){
+            return Promise.resolve();
+        }
+
+        const match = value.match(/tradeCode \d+/i);
         if(match){
             return Promise.resolve();
         }
@@ -52,11 +57,21 @@ function SearchField(props){
     // 2. 检验输入的checkCallNo
     const validCallNo = (_, value) => {
         console.log(`输入序号为${value}`);
+        // 输入为空值也可通过验证
+        if(!value){
+            return Promise.resolve();
+        }
+
         const input = parseInt(value);
         if(input){
             return Promise.resolve();
         }
         return Promise.reject("输入错误，呼叫序号必须为数字");
+    }
+
+    // TODO：至少一个不为空，否则不能查询
+    const validSearch = (values) => {
+
     }
 
     const onFinish = (values)=>{
@@ -70,28 +85,30 @@ function SearchField(props){
         
     }
 
+    // 重置表单输入框
     const onReset = () => {
         form.resetFields();
         props.onReset();
     }
 
+
     return (
         <Card className='searchField'>
             <Form name="search" form={form} onFinish={onFinish} autoComplete="false">
                 <Row align="end">
-                    <Col span={6}>
+                    <Col span={6} align="end">
                         <Form.Item name="name" label="规则名称" rules={[{validator: validName}]}>
                             <Input placeholder='请输入名称'/>
                         </Form.Item>
                     </Col>
 
-                    <Col span={6} offset={4}>
+                    <Col span={6} offset={4} align="end">
                         <Form.Item name="callNo" label="呼叫序号" rules={[{validator: validCallNo}]}>
                             <Input placeholder='请输入序号'/>
                         </Form.Item>
                     </Col>
 
-                    <Col span={4} offset={3}>
+                    <Col span={4} offset={3} align="end">
                         <Form.Item name="buttons">
                             <Space size="large">
                                 <Button name="reset" onClick={onReset}>重置</Button>
@@ -287,14 +304,20 @@ function TableField(props){
         }
     } )
 
+    // 刷新表格
+    const refresh = () => {
+        props.refresh();
+    }
+
     return (
         <Card className='tableField'>
-            <Row justify="space-evenly">
+            <Row justify="start" align='middle'>
                 <Col span={4}>
                     <Title level={4}>查询表格</Title>
+                    <Text type="secondary">共计{props.data.length}条数据</Text>
                 </Col>
 
-                <Col span={8} offset={12}>
+                <Col span={4} offset={14}>
                     <Space align='baseline' size="large">
                         <Button name="add" type="primary" onClick={add}>新增</Button>
                         <Popconfirm title="是否要批量删除所勾选的数据？"
@@ -304,7 +327,7 @@ function TableField(props){
                                     cancelText="否">
                             <Button name='deleteMult' type="primary">批量删除</Button>
                         </Popconfirm>
-                        <ReloadOutlined />
+                        <ReloadOutlined onClick={refresh}/>
                         <ColumnHeightOutlined />
                         <SettingFilled />
                     </Space>
@@ -345,13 +368,39 @@ function UserForm(props){
         console.log("in father handleSearch, get searchValues:");
         const {name, callNo} = values;
         console.log(name, callNo);
+        
+        // TODO：当查询条件很多时，如何优化判断逻辑？
+        let result = [];
+        if(name && callNo){
+            // 两个个条件都不为空：
+            result = data.filter( item => {
+                if(item.name === name && item.callNo === parseInt(callNo)){
+                    return item;
+                }
+                return null;
+            })
 
-        const result = data.filter( item => {
-            if(item.name === name && item.callNo === parseInt(callNo)){
-                return item;
-            }
-            return null;
-        })
+        }else if(name){
+            // 只查询name
+            result = data.filter( item => {
+                if(item.name === name){
+                    return item;
+                }
+                return null;
+            })
+        }else if(callNo){
+            // 只查询callNo
+            result = data.filter( item => {
+                if(item.callNo === parseInt(callNo)){
+                    return item;
+                }
+                return null;
+            })
+        }else{
+            // 二者都为空
+            result = data;
+        }
+
         console.log("search result:");
         console.log(result);
         setSelectData(result);
@@ -364,19 +413,25 @@ function UserForm(props){
         setIsSearched(false);
     }
 
+    const updateData = (key, row, data) => {
+        const newData = [...data];
+        const index = newData.findIndex((item)=>item.key === key);
+        const oldRow = newData[index];
+        // 从index起始，修改1条数据，修改为{...oldRow, ...modefiedRow}=》用modified的值覆盖old值
+        newData.splice(index, 1, {...oldRow, ...row});
+        return newData;
+    }
+
     // UPDATE: 修改一条数据并将结果保存，该函数传递给TableField执行
     // TODO：调用接口，数据库修改函数
     const handleEdit = (key, modifiedRow) => {
         console.log("in father handleEdit, modifiedRow:");
         console.log(modifiedRow);
-        //const key = modifiedRow['key'];
-        // 被修改的行的index
-        const newData = [...data];
-        const index = newData.findIndex((item)=>item.key === key);
-        const oldRow = newData[index];
-        // 从index起始，修改1条数据，修改为{...oldRow, ...modefiedRow}=》用modified的值覆盖old值
-        newData.splice(index, 1, {...oldRow, ...modifiedRow});
-        setData(newData);
+        // 修改 data域
+        setData(updateData(key, modifiedRow, data));
+
+        // 修改 selectData域
+        setSelectData(updateData(key, modifiedRow, selectData));
     }
 
     // ADD: 新增一条数据并将结果保存，新增逻辑可在函数getOneNewData(nextKey)中自定义
@@ -388,6 +443,8 @@ function UserForm(props){
         newData.push(getOneNewData(nextKey))
         setMaxKey(nextKey);
         setData(newData);
+        // 刷新表单域
+        setIsSearched(false);
     }
 
     // DELETE: 删除一条、或多条数据，传入数据的key即可
@@ -403,6 +460,13 @@ function UserForm(props){
             }
         })
         setData(newData);
+        // 刷新表单域
+        setIsSearched(false);
+    }
+
+    // 刷新表格，删除查询条件
+    const refresh = () => {
+        setIsSearched(false);
     }
 
     // 如果查询，isSearched=true，TableField的data渲染selectData，否则渲染data
@@ -413,7 +477,8 @@ function UserForm(props){
                 <TableField data={isSearched ? selectData : data} columns={props.usercol}
                             handleEdit={handleEdit}
                             handleAdd={handleAdd}
-                            handleDelete={handleDelete}/>
+                            handleDelete={handleDelete}
+                            refresh={refresh}/>
             </Space>
         </React.Fragment>
     )
