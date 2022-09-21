@@ -35,4 +35,4 @@ usercol.push({
 
 console.log()
 
-export {userdata, usercol};
+export {userdata, usercol}
